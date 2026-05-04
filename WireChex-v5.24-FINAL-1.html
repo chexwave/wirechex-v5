@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WireChex v5.10 — Batch 7 v5.24 - #8 REFINEMENT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .grid-container { overflow: auto; max-height: 900px; border: 4px solid #334155; border-radius: 24px; background: #f8fafc; }
+        svg { transition: transform 0.2s ease; width: 100%; height: auto; max-width: 1300px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <h1 class="text-4xl font-bold text-center mb-2">WireChex v5.25</h1>
+        <p class="text-center text-emerald-400 font-bold mb-8">✅ Name + Location • Dynamic Port Colors • Direct Wire-to-Port Connection • All Previous Features</p>
+
+        <div class="flex justify-center gap-4 mb-6 flex-wrap">
+            <div class="flex items-center gap-3 bg-slate-900 rounded-3xl px-6 py-3">
+                <span class="font-medium">Rows</span>
+                <input id="grid-rows" type="number" value="20" min="8" max="50" class="w-20 bg-slate-800 text-white text-center rounded-2xl px-3 py-2">
+            </div>
+            <div class="flex items-center gap-3 bg-slate-900 rounded-3xl px-6 py-3">
+                <span class="font-medium">Columns</span>
+                <input id="grid-cols" type="number" value="15" min="8" max="30" class="w-20 bg-slate-800 text-white text-center rounded-2xl px-3 py-2">
+            </div>
+            <button onclick="resizeGrid()" class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-3xl font-semibold">Resize Grid</button>
+            <div class="flex items-center gap-2 bg-slate-900 rounded-3xl px-6 py-3">
+                <button onclick="zoomOut()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold">-</button>
+                <span id="zoom-level" class="font-mono w-12 text-center">100%</span>
+                <button onclick="zoomIn()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold">+</button>
+            </div>
+        </div>
+
+        <div class="flex gap-6 justify-center">
+            <!-- Diagram -->
+            <div>
+                <div class="grid-container mx-auto w-full max-w-[1300px]">
+                    <svg id="wirechex-svg" height="1100" viewBox="0 0 1300 1100" xmlns="http://www.w3.org/2000/svg"></svg>
+                </div>
+            </div>
+
+            <!-- Device Inspector (Option 3) -->
+            <div id="device-inspector" class="hidden w-80 bg-slate-900 rounded-3xl p-6 flex-shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-lg">Device Inspector</h3>
+                    <button onclick="clearSelection()" class="text-slate-400 hover:text-white">✕</button>
+                </div>
+                
+                <div id="inspector-content">
+                    <div class="text-center text-slate-400 py-8">
+                        Click any device box<br>to inspect it
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 mt-8">
+            <!-- Add Device -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">➕ Add Device</h3>
+                <input id="new-device-name" type="text" placeholder="Device name" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 mb-3">
+                <input id="new-device-location" type="text" placeholder="Location (e.g. *Behind Helm)" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 mb-3">
+                <div class="flex gap-3 mb-3">
+                    <select id="new-device-ports" class="flex-1 bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3">
+                        <option value="4">4 ports</option>
+                        <option value="2">2 ports</option>
+                        <option value="3">3 ports</option>
+                        <option value="5">5 ports</option>
+                        <option value="6">6 ports</option>
+                        <option value="1">1 port</option>
+                    </select>
+                    <input id="new-device-color" type="color" value="#3b82f6" class="w-12 h-12 bg-slate-800 border border-slate-700 rounded-2xl cursor-pointer">
+                </div>
+                <button onclick="addNewDevice()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-3xl">Add Device</button>
+
+                <div class="mt-6">
+                    <p class="text-xs text-slate-400 mb-2">QUICK PRESETS</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="quickAddDevice('D',4,'#3b82f6','*Behind Helm')" class="text-xs px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-2xl">D (*Behind Helm)</button>
+                        <button onclick="quickAddDevice('GPS',2,'#f59e0b','*Helm')" class="text-xs px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-2xl">GPS (*Helm)</button>
+                        <button onclick="quickAddDevice('SW',6,'#8b5cf6','*Starboard')" class="text-xs px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-2xl">SW (*Starboard)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Devices -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">🗑️ Manage Devices</h3>
+                <div id="device-list" class="space-y-3 max-h-80 overflow-auto"></div>
+            </div>
+
+            <!-- Add Wire -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">Add Wire</h3>
+                <select id="port-from" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 mb-3"></select>
+                <select id="port-to" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 mb-3"></select>
+                <div class="mb-4">
+                    <label class="block text-xs text-slate-400 mb-1">Wire Color</label>
+                    <select id="wire-color" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3">
+                        <option value="#3b82f6" selected>Blue - Network</option>
+                        <option value="#ef4444">Red - Power</option>
+                        <option value="#10b981">Green - Coax</option>
+                        <option value="#f59e0b">Orange - Transducer</option>
+                        <option value="#8b5cf6">Purple - Audio</option>
+                        <option value="#000000">Black - N2K</option>
+                        <option value="#eab308">Yellow - Ground</option>
+                        <option value="#854d0e">Brown - Video</option>
+                        <option value="#ec4899">Pink - Other</option>
+                    </select>
+                </div>
+                <button onclick="addWire()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-3xl text-lg">Connect (Dynamic Routing + Jumpers)</button>
+            </div>
+
+            <!-- Current Wires -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">Current Wires <span class="text-emerald-400 text-sm font-normal">(click 🗑️ to delete)</span></h3>
+                <div id="wire-list" class="space-y-2 max-h-64 overflow-auto"></div>
+            </div>
+
+            <!-- Occupied Nodes -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">Occupied Nodes</h3>
+                <pre id="occupied-log" class="text-xs font-mono bg-slate-950 p-4 rounded-2xl h-64 overflow-auto"></pre>
+            </div>
+
+            <!-- Legend -->
+            <div class="bg-slate-900 rounded-3xl p-6">
+                <h3 class="font-semibold mb-4">Wire Color Legend</h3>
+                <div id="wire-legend" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <div class="flex gap-4 justify-center mt-8">
+            <button onclick="resetAll()" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-3xl">Reset All</button>
+            <button onclick="downloadSVG()" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-3xl">Download SVG</button>
+        </div>
+    </div>
+
+    <script>
+        class WireChexEngine {
+            constructor() {
+                this.ROWS = 20;
+                this.COLS = 15;
+                this.occupied = new Set();
+                this.wires = [];
+                this.devices = [
+                    { id: 'devA', name: 'A', location: '', boxColor: '#3b82f6', ports: 4, startRow: 1 },
+                    { id: 'devB', name: 'B', location: '', boxColor: '#10b981', ports: 4, startRow: 6 },
+                    { id: 'devC', name: 'C', location: '', boxColor: '#8b5cf6', ports: 2, startRow: 11 }
+                ];
+                this.dynamicPORTS = {};
+                this.zoomLevel = 1;
+                this.rebuildDynamicPorts();
+            }
+
+            rebuildDynamicPorts() {
+                this.dynamicPORTS = {};
+                let currentRow = 1;
+                this.devices.forEach(dev => {
+                    dev.startRow = currentRow;
+                    for (let i = 1; i <= dev.ports; i++) {
+                        const portKey = dev.name + i;
+                        this.dynamicPORTS[portKey] = { 
+                            row: currentRow + i - 1, 
+                            deviceColor: dev.boxColor,
+                            connectedColor: dev.boxColor,
+                            deviceId: dev.id 
+                        };
+                    }
+                    currentRow += dev.ports + 3;
+                });
+                this.updatePortColors();
+            }
+
+            updatePortColors() {
+                Object.keys(this.dynamicPORTS).forEach(key => {
+                    this.dynamicPORTS[key].connectedColor = this.dynamicPORTS[key].deviceColor;
+                });
+                this.wires.forEach(w => {
+                    if (this.dynamicPORTS[w.from]) this.dynamicPORTS[w.from].connectedColor = w.color;
+                    if (this.dynamicPORTS[w.to]) this.dynamicPORTS[w.to].connectedColor = w.color;
+                });
+            }
+
+            getPortRow(port) {
+                return this.dynamicPORTS[port] ? this.dynamicPORTS[port].row : 1;
+            }
+
+            addDevice(name, ports, boxColor, location = '') {
+                if (!name || ports < 1 || ports > 6) return false;
+                let cleanName = name.trim().toUpperCase().slice(0, 12) || 'X';
+                let finalName = cleanName;
+                let counter = 1;
+                while (this.devices.some(d => d.name === finalName)) {
+                    finalName = cleanName + counter++;
+                }
+                this.devices.push({
+                    id: 'dev' + Date.now().toString(36),
+                    name: finalName,
+                    location: location.trim(),
+                    boxColor: boxColor,
+                    ports: parseInt(ports),
+                    startRow: 0
+                });
+                this.rebuildDynamicPorts();
+                return true;
+            }
+
+            deleteDevice(deviceId) {
+                this.wires = this.wires.filter(w => {
+                    const fromPort = this.dynamicPORTS[w.from];
+                    const toPort = this.dynamicPORTS[w.to];
+                    return !(fromPort && fromPort.deviceId === deviceId) && !(toPort && toPort.deviceId === deviceId);
+                });
+                this.devices = this.devices.filter(d => d.id !== deviceId);
+                this.reoccupyAllWires();
+                this.rebuildDynamicPorts();
+                return true;
+            }
+
+            deleteWire(index) {
+                if (index < 0 || index >= this.wires.length) return false;
+                this.wires.splice(index, 1);
+                this.reoccupyAllWires();
+                this.rebuildDynamicPorts();
+                return true;
+            }
+
+            findLeftmostFreeColumn(row1, row2) {
+                const minR = Math.min(row1, row2);
+                const maxR = Math.max(row1, row2);
+                for (let col = 1; col <= this.COLS; col++) {
+                    let free = true;
+                    for (let r = minR; r <= maxR; r++) {
+                        if (this.occupied.has(r + "," + col)) { free = false; break; }
+                    }
+                    if (free) return col;
+                }
+                return 5;
+            }
+
+            drawGrid(svg) {
+                const cellWidth = 80;
+                const cellHeight = 48;
+                const leftOffset = 360;
+                const topOffset = 60;
+                const totalWidth = leftOffset + this.COLS * cellWidth + 120;
+                const totalHeight = topOffset + this.ROWS * cellHeight + 80;
+                svg.setAttribute("width", totalWidth);
+                svg.setAttribute("height", totalHeight);
+                svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalHeight}`);
+                for (let x = 1; x <= this.COLS; x++) {
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", leftOffset + x*cellWidth);
+                    line.setAttribute("y1", topOffset);
+                    line.setAttribute("x2", leftOffset + x*cellWidth);
+                    line.setAttribute("y2", topOffset + this.ROWS*cellHeight);
+                    line.setAttribute("stroke", "#334155"); line.setAttribute("stroke-width", "3");
+                    svg.appendChild(line);
+                }
+                for (let y = 1; y <= this.ROWS; y++) {
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", leftOffset);
+                    line.setAttribute("y1", topOffset + y*cellHeight);
+                    line.setAttribute("x2", leftOffset + this.COLS*cellWidth);
+                    line.setAttribute("y2", topOffset + y*cellHeight);
+                    line.setAttribute("stroke", "#334155"); line.setAttribute("stroke-width", "3");
+                    svg.appendChild(line);
+                }
+                for (let x = 1; x <= this.COLS; x++) {
+                    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    t.setAttribute("x", leftOffset + x*cellWidth); t.setAttribute("y", topOffset + this.ROWS*cellHeight + 28);
+                    t.setAttribute("text-anchor", "middle"); t.setAttribute("fill", "#64748b");
+                    t.setAttribute("font-size", "14"); t.textContent = x; svg.appendChild(t);
+                }
+                for (let y = 1; y <= this.ROWS; y++) {
+                    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    t.setAttribute("x", leftOffset + this.COLS*cellWidth + 22); t.setAttribute("y", topOffset + y*cellHeight + 6);
+                    t.setAttribute("fill", "#64748b"); t.setAttribute("font-size", "14");
+                    t.textContent = y; svg.appendChild(t);
+                }
+            }
+
+            drawPorts(svg) {
+                Object.keys(this.dynamicPORTS).forEach(key => {
+                    const p = this.dynamicPORTS[key];
+                    const y = 60 + p.row * 48;
+                    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    c.setAttribute("cx", "320"); c.setAttribute("cy", y); c.setAttribute("r", "18");
+                    c.setAttribute("fill", p.connectedColor); c.setAttribute("stroke", "#1e40af");
+                    c.setAttribute("stroke-width", "4"); svg.appendChild(c);
+
+                    const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    lbl.setAttribute("x", "300"); lbl.setAttribute("y", y + 6);
+                    lbl.setAttribute("text-anchor", "end");
+                    lbl.setAttribute("fill", "#1e40af"); lbl.setAttribute("font-weight", "700");
+                    lbl.setAttribute("font-size", "14"); lbl.textContent = key; svg.appendChild(lbl);
+                });
+            }
+
+            drawDeviceBoxes(svg) {
+                const RIGHT_EDGE = 340;           // All device boxes right edge aligned here
+                const BOX_WIDTH = 320;            // Fixed width for perfect right-edge alignment
+
+                this.devices.forEach(dev => {
+                    const boxY = 60 + (dev.startRow - 1) * 48 - 45;
+
+                    // Smart multi-line name handling for long names
+                    let nameLine1 = dev.name;
+                    let nameLine2 = '';
+                    let isTwoLineName = false;
+
+                    if (dev.name.length > 14) {
+                        const breakPoint = dev.name.lastIndexOf(' ', 14);
+                        if (breakPoint > 7) {
+                            nameLine1 = dev.name.substring(0, breakPoint);
+                            nameLine2 = dev.name.substring(breakPoint + 1);
+                        } else {
+                            nameLine1 = dev.name.substring(0, 14);
+                            nameLine2 = dev.name.substring(14);
+                        }
+                        isTwoLineName = true;
+                    }
+
+                    const boxWidth = BOX_WIDTH;
+                    const boxX = RIGHT_EDGE - boxWidth;
+
+                    // Adjust height for 2-line names
+                    const baseHeight = dev.ports * 48 + 105;
+                    const height = isTwoLineName ? baseHeight + 18 : baseHeight;
+
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", boxX);
+                    rect.setAttribute("y", boxY);
+                    rect.setAttribute("width", boxWidth);
+                    rect.setAttribute("height", height);
+                    rect.setAttribute("fill", "#f1f5f9");
+                    rect.setAttribute("stroke", dev.boxColor);
+                    rect.setAttribute("stroke-width", "10");
+                    rect.setAttribute("rx", "20");
+                    rect.setAttribute("style", "cursor: pointer;");
+                    rect.onclick = () => selectDevice(dev.id);
+                    svg.appendChild(rect);
+
+                    const textCenterX = boxX + boxWidth / 2;
+
+                    // Name line 1 (bold)
+                    const nameLabel1 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    nameLabel1.setAttribute("x", textCenterX);
+                    nameLabel1.setAttribute("y", boxY + 36);
+                    nameLabel1.setAttribute("text-anchor", "middle");
+                    nameLabel1.setAttribute("fill", "#000000");
+                    nameLabel1.setAttribute("font-size", isTwoLineName ? "17" : "19");
+                    nameLabel1.setAttribute("font-weight", "700");
+                    nameLabel1.textContent = nameLine1;
+                    svg.appendChild(nameLabel1);
+
+                    // Name line 2 (if needed)
+                    if (isTwoLineName && nameLine2) {
+                        const nameLabel2 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        nameLabel2.setAttribute("x", textCenterX);
+                        nameLabel2.setAttribute("y", boxY + 56);
+                        nameLabel2.setAttribute("text-anchor", "middle");
+                        nameLabel2.setAttribute("fill", "#000000");
+                        nameLabel2.setAttribute("font-size", "15");
+                        nameLabel2.setAttribute("font-weight", "600");
+                        nameLabel2.textContent = nameLine2;
+                        svg.appendChild(nameLabel2);
+                    }
+
+                    // Location (adjust y position based on whether we used 2 lines for name)
+                    const locY = isTwoLineName ? boxY + 78 : boxY + 68;
+                    if (dev.location) {
+                        const locLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        locLabel.setAttribute("x", textCenterX);
+                        locLabel.setAttribute("y", locY);
+                        locLabel.setAttribute("text-anchor", "middle");
+                        locLabel.setAttribute("fill", "#000000");
+                        locLabel.setAttribute("font-size", "12");
+                        locLabel.setAttribute("font-weight", "700");
+                        locLabel.textContent = dev.location;
+                        svg.appendChild(locLabel);
+                    }
+                });
+            }
+
+            createWirePath(d, color) {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", d);
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke", color);
+                path.setAttribute("stroke-width", "14");
+                path.setAttribute("stroke-linecap", "round");
+                return path;
+            }
+
+            getCrossingsForHorizontal(row, hVCol, currentWire) {
+                const crossings = [];
+                for (let other of this.wires) {
+                    if (other === currentWire) continue;
+                    const oRow1 = this.getPortRow(other.from);
+                    const oRow2 = this.getPortRow(other.to);
+                    const oMin = Math.min(oRow1, oRow2);
+                    const oMax = Math.max(oRow1, oRow2);
+                    const oVCol = other.vCol;
+                    if (row >= oMin && row <= oMax && oVCol < hVCol) {
+                        crossings.push(oVCol);
+                    }
+                }
+                return crossings.sort((a, b) => a - b);
+            }
+
+            drawHorizontalWithJumpers(y, xStart, xEnd, crossingCols, color, group) {
+                const leftX = Math.min(xStart, xEnd);
+                const rightX = Math.max(xStart, xEnd);
+                const GRID_LEFT = 360;
+                const crossings = crossingCols.map(c => GRID_LEFT + c * 80)
+                    .filter(x => x > leftX + 10 && x < rightX - 10)
+                    .sort((a, b) => a - b);
+                let pos = leftX;
+                const HUMP_HALF_WIDTH = 28;
+                const HUMP_HEIGHT = 25;
+                for (let cx of crossings) {
+                    const humpStart = cx - HUMP_HALF_WIDTH;
+                    if (pos < humpStart - 5) {
+                        const straight = this.createWirePath('M ' + pos + ' ' + y + ' H ' + humpStart, color);
+                        group.appendChild(straight);
+                    }
+                    const humpEnd = cx + HUMP_HALF_WIDTH;
+                    const humpPath = this.createWirePath('M ' + humpStart + ',' + y + ' C ' + (humpStart+12) + ',' + (y-28) + ' ' + (cx-15) + ',' + (y-HUMP_HEIGHT) + ' ' + cx + ',' + (y-HUMP_HEIGHT) + ' C ' + (cx+15) + ',' + (y-HUMP_HEIGHT) + ' ' + (humpEnd-12) + ',' + (y-28) + ' ' + humpEnd + ',' + y, color);
+                    group.appendChild(humpPath);
+                    pos = humpEnd;
+                }
+                if (pos < rightX) {
+                    const remaining = this.createWirePath('M ' + pos + ' ' + y + ' H ' + rightX, color);
+                    group.appendChild(remaining);
+                }
+            }
+
+            renderAllWires() {
+                const svg = document.getElementById('wirechex-svg');
+                let group = document.getElementById('wires-group');
+                if (!group) return;
+                group.innerHTML = '';
+                const GRID_LEFT = 360;
+                const PORT_STUB_X = 330;
+
+                for (let wire of this.wires) {
+                    const row1 = this.getPortRow(wire.from);
+                    const row2 = this.getPortRow(wire.to);
+                    const xV = GRID_LEFT + wire.vCol * 80;
+                    const y1 = 60 + row1 * 48;
+                    const y2 = 60 + row2 * 48;
+                    const vertD = 'M ' + xV + ' ' + Math.min(y1,y2) + ' L ' + xV + ' ' + Math.max(y1,y2);
+                    group.appendChild(this.createWirePath(vertD, wire.color));
+                }
+
+                for (let wire of this.wires) {
+                    const row1 = this.getPortRow(wire.from);
+                    const row2 = this.getPortRow(wire.to);
+                    const vCol = wire.vCol;
+                    const xV = GRID_LEFT + vCol * 80;
+                    const y1 = 60 + row1 * 48;
+                    const y2 = 60 + row2 * 48;
+                    const color = wire.color;
+
+                    const portStub1 = this.createWirePath('M ' + PORT_STUB_X + ',' + y1 + ' H ' + GRID_LEFT, color);
+                    group.appendChild(portStub1);
+
+                    const startCross = this.getCrossingsForHorizontal(row1, vCol, wire);
+                    this.drawHorizontalWithJumpers(y1, GRID_LEFT, xV, startCross, color, group);
+
+                    const portStub2 = this.createWirePath('M ' + PORT_STUB_X + ',' + y2 + ' H ' + GRID_LEFT, color);
+                    group.appendChild(portStub2);
+
+                    const endCross = this.getCrossingsForHorizontal(row2, vCol, wire);
+                    this.drawHorizontalWithJumpers(y2, xV, GRID_LEFT, endCross, color, group);
+                }
+            }
+
+            addWire(from, to, color) {
+                if (!from || !to || from === to) return false;
+                const row1 = this.getPortRow(from);
+                const row2 = this.getPortRow(to);
+                const vCol = this.findLeftmostFreeColumn(row1, row2);
+                const nodes = [];
+                nodes.push(row1 + ",0");
+                nodes.push(row1 + "," + vCol);
+                for (let r = Math.min(row1, row2); r <= Math.max(row1, row2); r++) nodes.push(r + "," + vCol);
+                nodes.push(row2 + "," + vCol);
+                nodes.push(row2 + ",0");
+                nodes.forEach(n => this.occupied.add(n));
+                this.wires.push({from, to, color, vCol});
+                this.updatePortColors();
+                return true;
+            }
+
+            reoccupyAllWires() {
+                this.occupied.clear();
+                this.wires.forEach(w => {
+                    const row1 = this.getPortRow(w.from);
+                    const row2 = this.getPortRow(w.to);
+                    const nodes = [];
+                    nodes.push(row1 + ",0");
+                    nodes.push(row1 + "," + w.vCol);
+                    for (let r = Math.min(row1, row2); r <= Math.max(row1, row2); r++) nodes.push(r + "," + w.vCol);
+                    nodes.push(row2 + "," + w.vCol);
+                    nodes.push(row2 + ",0");
+                    nodes.forEach(n => this.occupied.add(n));
+                });
+            }
+
+            redrawEverything() {
+                const svg = document.getElementById('wirechex-svg');
+                svg.innerHTML = '';
+                this.drawGrid(svg);
+                this.drawDeviceBoxes(svg);
+                this.drawPorts(svg);
+                const wiresGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                wiresGroup.setAttribute("id", "wires-group");
+                svg.appendChild(wiresGroup);
+                this.renderAllWires();
+            }
+
+            resizeGrid(newRows, newCols) {
+                this.ROWS = Math.max(8, Math.min(50, newRows));
+                this.COLS = Math.max(8, Math.min(30, newCols));
+                this.rebuildDynamicPorts();
+                this.redrawEverything();
+            }
+        }
+
+        let engine = new WireChexEngine();
+
+        const WIRE_LEGEND = {
+            '#ef4444': 'Power', '#3b82f6': 'Network', '#000000': 'N2K', '#10b981': 'Coax',
+            '#f59e0b': 'Transducer', '#eab308': 'Ground', '#8b5cf6': 'Audio',
+            '#854d0e': 'Video', '#ec4899': 'Other'
+        };
+
+        function renderLegend() {
+            const container = document.getElementById('wire-legend');
+            container.innerHTML = Object.entries(WIRE_LEGEND).map(([color, label]) => `
+                <div class="flex items-center gap-3 bg-slate-800 rounded-2xl px-4 py-2">
+                    <div class="w-6 h-6 rounded-xl flex-shrink-0" style="background: ${color};"></div>
+                    <span class="font-medium text-slate-200">${label}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderDeviceList() {
+            const container = document.getElementById('device-list');
+            container.innerHTML = engine.devices.map(dev => `
+                <div class="flex items-center justify-between bg-slate-800 rounded-2xl px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-6 h-6 rounded-xl flex-shrink-0" style="background: ${dev.boxColor};"></div>
+                        <div>
+                            <span class="font-semibold">${dev.name}</span>
+                            ${dev.location ? `<span class="text-xs text-slate-400 ml-2">${dev.location}</span>` : ''}
+                            <span class="text-xs text-slate-400 ml-2">(${dev.ports} ports)</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteDevice('${dev.id}')" class="text-red-400 hover:text-red-500 text-xl px-3 py-1">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteDevice(deviceId) {
+            if (confirm("Delete this device and ALL wires connected to it?")) {
+                engine.deleteDevice(deviceId);
+                engine.redrawEverything();
+                populateSelects();
+                updateUI();
+                renderDeviceList();
+            }
+        }
+
+        function deleteWire(index) {
+            if (confirm("Delete this wire?")) {
+                engine.deleteWire(index);
+                engine.redrawEverything();
+                populateSelects();
+                updateUI();
+                clearSelection();
+            }
+        }
+
+        // === Device Inspector (Option 3) ===
+        let currentSelectedDeviceId = null;
+
+        function selectDevice(deviceId) {
+            currentSelectedDeviceId = deviceId;
+            const dev = engine.devices.find(d => d.id === deviceId);
+            if (!dev) return;
+
+            const inspector = document.getElementById('device-inspector');
+            const content = document.getElementById('inspector-content');
+
+            // Get connected wires for this device
+            const connectedWires = engine.wires.filter(w => {
+                const fromPort = engine.dynamicPORTS[w.from];
+                const toPort = engine.dynamicPORTS[w.to];
+                return (fromPort && fromPort.deviceId === deviceId) || (toPort && toPort.deviceId === deviceId);
+            });
+
+            content.innerHTML = `
+                <div class="mb-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-6 h-6 rounded-xl flex-shrink-0" style="background: ${dev.boxColor};"></div>
+                        <div>
+                            <div class="font-bold text-xl">${dev.name}</div>
+                            ${dev.location ? `<div class="text-sm text-slate-400">${dev.location}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 rounded-2xl p-4 mb-4">
+                    <div class="text-xs text-slate-400 mb-1">PORTS</div>
+                    <div class="font-mono text-sm">${dev.ports} ports</div>
+                </div>
+
+                <div class="bg-slate-800 rounded-2xl p-4 mb-4">
+                    <div class="text-xs text-slate-400 mb-2">CONNECTED WIRES (${connectedWires.length})</div>
+                    ${connectedWires.length > 0 ? connectedWires.map(w => `
+                        <div class="flex items-center justify-between text-sm py-1 border-b border-slate-700 last:border-0">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full" style="background: ${w.color};"></div>
+                                <span>${w.from} → ${w.to}</span>
+                            </div>
+                            <span class="text-xs text-slate-400">col ${w.vCol}</span>
+                        </div>
+                    `).join('') : '<div class="text-sm text-slate-400">No connections</div>'}
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="changeDeviceColor('${deviceId}')" 
+                            class="flex-1 bg-slate-700 hover:bg-slate-600 text-sm py-2 rounded-2xl">Change Color</button>
+                    <button onclick="deleteSelectedDevice()" 
+                            class="flex-1 bg-red-600 hover:bg-red-500 text-sm py-2 rounded-2xl">Delete</button>
+                </div>
+            `;
+
+            inspector.classList.remove('hidden');
+            inspector.classList.add('flex', 'flex-col');
+
+            // Re-draw to show selection highlight (optional visual feedback)
+            engine.redrawEverything();
+        }
+
+        function clearSelection() {
+            currentSelectedDeviceId = null;
+            const inspector = document.getElementById('device-inspector');
+            inspector.classList.add('hidden');
+            inspector.classList.remove('flex', 'flex-col');
+            
+            // Re-draw without selection
+            engine.redrawEverything();
+        }
+
+        function changeDeviceColor(deviceId) {
+            const dev = engine.devices.find(d => d.id === deviceId);
+            if (!dev) return;
+
+            const newColor = prompt("Enter new hex color (e.g. #ff0000):", dev.boxColor);
+            if (newColor && newColor.match(/^#[0-9A-Fa-f]{6}$/)) {
+                dev.boxColor = newColor;
+                engine.redrawEverything();
+                selectDevice(deviceId); // refresh inspector
+            }
+        }
+
+        function deleteSelectedDevice() {
+            if (!currentSelectedDeviceId) return;
+            if (confirm("Delete this device and all its wires?")) {
+                engine.deleteDevice(currentSelectedDeviceId);
+                clearSelection();
+                engine.redrawEverything();
+                populateSelects();
+                updateUI();
+                renderDeviceList();
+            }
+        }
+
+        function addNewDevice() {
+            const name = document.getElementById('new-device-name').value;
+            const location = document.getElementById('new-device-location').value;
+            const ports = document.getElementById('new-device-ports').value;
+            const color = document.getElementById('new-device-color').value;
+            if (engine.addDevice(name, ports, color, location)) {
+                engine.redrawEverything();
+                populateSelects();
+                updateUI();
+                renderDeviceList();
+                document.getElementById('new-device-name').value = '';
+                document.getElementById('new-device-location').value = '';
+            }
+        }
+
+        function quickAddDevice(name, ports, color, location = '') {
+            if (engine.addDevice(name, ports, color, location)) {
+                engine.redrawEverything();
+                populateSelects();
+                updateUI();
+                renderDeviceList();
+            }
+        }
+
+        function addWire() {
+            const from = document.getElementById('port-from').value;
+            const to = document.getElementById('port-to').value;
+            const color = document.getElementById('wire-color').value;
+            if (engine.addWire(from, to, color)) {
+                engine.redrawEverything();
+                updateUI();
+            } else {
+                alert("Select two different ports");
+            }
+        }
+
+        function updateUI() {
+            const log = document.getElementById('occupied-log');
+            log.textContent = Array.from(engine.occupied).sort().join('\n') || 'Empty';
+            const list = document.getElementById('wire-list');
+            list.innerHTML = engine.wires.map((w, index) => `
+                <div class="flex items-center justify-between bg-slate-800 rounded-2xl px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 rounded-full flex-shrink-0" style="background: ${w.color}; box-shadow: 0 0 0 3px rgba(255,255,255,0.2);"></div>
+                        <span class="font-semibold">${w.from} → ${w.to}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-mono text-slate-400">col ${w.vCol}</span>
+                        <button onclick="deleteWire(${index})" class="text-red-400 hover:text-red-500 text-2xl px-2 py-1">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateSelects() {
+            const fromSel = document.getElementById('port-from');
+            const toSel = document.getElementById('port-to');
+            fromSel.innerHTML = toSel.innerHTML = '<option value="">Select port...</option>';
+            Object.keys(engine.dynamicPORTS).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p; opt.textContent = p;
+                fromSel.appendChild(opt.cloneNode(true));
+                toSel.appendChild(opt);
+            });
+        }
+
+        function resizeGrid() {
+            const rows = parseInt(document.getElementById('grid-rows').value) || 20;
+            const cols = parseInt(document.getElementById('grid-cols').value) || 15;
+            engine.resizeGrid(rows, cols);
+            populateSelects();
+            renderDeviceList();
+        }
+
+        function zoomIn() {
+            engine.zoomLevel = Math.min(engine.zoomLevel + 0.25, 2);
+            document.getElementById('wirechex-svg').style.transform = `scale(${engine.zoomLevel})`;
+            document.getElementById('zoom-level').textContent = Math.round(engine.zoomLevel * 100) + '%';
+        }
+
+        function zoomOut() {
+            engine.zoomLevel = Math.max(engine.zoomLevel - 0.25, 0.5);
+            document.getElementById('wirechex-svg').style.transform = `scale(${engine.zoomLevel})`;
+            document.getElementById('zoom-level').textContent = Math.round(engine.zoomLevel * 100) + '%';
+        }
+
+        function resetAll() { location.reload(); }
+
+        function downloadSVG() {
+            const svg = document.getElementById('wirechex-svg');
+            const blob = new Blob([svg.outerHTML], {type: 'image/svg+xml'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'wirechex-v5.24.svg';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        window.onload = () => {
+            engine.redrawEverything();
+            populateSelects();
+            renderLegend();
+            updateUI();
+            renderDeviceList();
+        };
+    </script>
+</body>
+</html>
